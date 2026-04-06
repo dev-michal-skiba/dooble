@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dooble Card Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { margin-bottom: 8px; }
+        .subtitle { color: #666; margin-bottom: 24px; }
+        section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 { font-size: 1.1em; margin-bottom: 12px; }
+        label { display: block; margin-bottom: 8px; font-weight: 500; }
+        input[type="file"] {
+            display: block;
+            margin-bottom: 12px;
+        }
+        .thumbnails {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+        }
+        .thumbnails img {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .stats {
+            background: #e8f4fd;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        .stats.warning {
+            background: #fff3cd;
+        }
+        .stats.error {
+            background: #f8d7da;
+        }
+        .grid-inputs {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .grid-inputs label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0;
+        }
+        .grid-inputs input[type="number"] {
+            width: 60px;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        .preview-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 12px;
+        }
+        #layout-preview {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-width: 100%;
+        }
+        button {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled {
+            background: #93c5fd;
+            cursor: not-allowed;
+        }
+        progress {
+            width: 100%;
+            height: 20px;
+            margin-top: 12px;
+            border-radius: 4px;
+        }
+        #download-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: #16a34a;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        #download-link:hover { background: #15803d; }
+        .hidden { display: none !important; }
+        .back-preview {
+            margin-top: 8px;
+        }
+        .back-preview img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dooble Card Generator</h1>
+    <p class="subtitle">Generate printable Dobble/Spot It! cards from your images</p>
+
+    <section>
+        <h2>1. Upload Card Images</h2>
+        <label for="front-images">Front images (select multiple):</label>
+        <input type="file" id="front-images" multiple accept="image/*">
+        <div id="front-thumbnails" class="thumbnails"></div>
+
+        <label for="back-image">Card back image:</label>
+        <input type="file" id="back-image" accept="image/*">
+        <div id="back-preview" class="back-preview"></div>
+
+        <div id="upload-stats" class="stats hidden"></div>
+    </section>
+
+    <section>
+        <h2>2. Page Layout</h2>
+        <div class="grid-inputs">
+            <label>Cards per row: <input type="number" id="cols" value="3" min="1" max="6"></label>
+            <label>Rows per page: <input type="number" id="rows" value="3" min="1" max="6"></label>
+        </div>
+        <div class="preview-container">
+            <canvas id="layout-preview" width="210" height="297"></canvas>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Generate PDF</h2>
+        <button id="generate-btn" disabled>Generate PDF</button>
+        <progress id="progress" max="100" value="0" class="hidden"></progress>
+        <div>
+            <a id="download-link" class="hidden" download="dooble-cards.pdf">Download PDF</a>
+        </div>
+    </section>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <script>
+        if (!window.jspdf) {
+            document.write('<script src="https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"><\/script>');
+        }
+    </script>
+    <script src="dobble.js"></script>
+    <script>
+        // --- State ---
+        let frontImages = [];
+        let backImageEl = null;
+
+        // --- DOM refs ---
+        const frontInput = document.getElementById('front-images');
+        const backInput = document.getElementById('back-image');
+        const frontThumbs = document.getElementById('front-thumbnails');
+        const backPreview = document.getElementById('back-preview');
+        const statsDiv = document.getElementById('upload-stats');
+        const colsInput = document.getElementById('cols');
+        const rowsInput = document.getElementById('rows');
+        const previewCanvas = document.getElementById('layout-preview');
+        const generateBtn = document.getElementById('generate-btn');
+        const progressBar = document.getElementById('progress');
+        const downloadLink = document.getElementById('download-link');
+
+        // --- Image loading ---
+        function loadImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = reader.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        frontInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            frontThumbs.innerHTML = '';
+            frontImages = [];
+
+            try {
+                frontImages = await Promise.all(files.map(f => loadImage(f)));
+                for (const img of frontImages) {
+                    const thumb = document.createElement('img');
+                    thumb.src = img.src;
+                    frontThumbs.appendChild(thumb);
+                }
+            } catch (err) {
+                console.error('Error loading images:', err);
+            }
+
+            updateStats();
+            updatePreview();
+            updateGenerateButton();
+        });
+
+        backInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                backImageEl = await loadImage(file);
+                backPreview.innerHTML = '';
+                const thumb = document.createElement('img');
+                thumb.src = backImageEl.src;
+                backPreview.appendChild(thumb);
+            } catch (err) {
+                console.error('Error loading back image:', err);
+            }
+
+            updateGenerateButton();
+        });
+
+        // --- Stats ---
+        function updateStats() {
+            const n = frontImages.length;
+            if (n === 0) {
+                statsDiv.classList.add('hidden');
+                return;
+            }
+
+            statsDiv.classList.remove('hidden');
+
+            if (n < 7) {
+                statsDiv.className = 'stats error';
+                statsDiv.innerHTML = `${n} images uploaded. Need at least 7 images (minimum for p=2: 7 cards with 3 images each).`;
+                return;
+            }
+
+            const info = getCardInfo(n);
+            const unused = n - info.totalSymbols;
+
+            statsDiv.className = unused > 0 ? 'stats warning' : 'stats';
+            statsDiv.innerHTML =
+                `<strong>${n}</strong> images uploaded<br>` +
+                `Prime order: <strong>p = ${info.p}</strong><br>` +
+                `Cards to generate: <strong>${info.totalCards}</strong><br>` +
+                `Images per card: <strong>${info.symbolsPerCard}</strong><br>` +
+                `Images used: <strong>${info.totalSymbols}</strong>` +
+                (unused > 0 ? ` (${unused} unused)` : '');
+        }
+
+        // --- Layout preview ---
+        function updatePreview() {
+            const cols = parseInt(colsInput.value) || 1;
+            const rows = parseInt(rowsInput.value) || 1;
+
+            const scale = 1.5;
+            const pageW = 210 * scale;
+            const pageH = 297 * scale;
+            previewCanvas.width = pageW;
+            previewCanvas.height = pageH;
+            previewCanvas.style.width = `${210}px`;
+            previewCanvas.style.height = `${297}px`;
+
+            const ctx = previewCanvas.getContext('2d');
+
+            // Page background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, pageW, pageH);
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, pageW, pageH);
+
+            const margin = 10 * scale;
+            const usableW = pageW - 2 * margin;
+            const usableH = pageH - 2 * margin;
+            const minGap = MIN_CARD_GAP * scale;
+            const cardDiameter = Math.min(
+                (usableW - minGap * (cols + 1)) / cols,
+                (usableH - minGap * (rows + 1)) / rows
+            );
+            const gutterX = (usableW - cardDiameter * cols) / (cols + 1);
+            const gutterY = (usableH - cardDiameter * rows) / (rows + 1);
+
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 1.5;
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const x = margin + gutterX + col * (cardDiameter + gutterX) + cardDiameter / 2;
+                    const y = margin + gutterY + row * (cardDiameter + gutterY) + cardDiameter / 2;
+                    ctx.beginPath();
+                    ctx.arc(x, y, cardDiameter / 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Show card diameter in mm
+            const diamMm = (cardDiameter / scale).toFixed(1);
+            ctx.fillStyle = '#666';
+            ctx.font = `${11 * scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`Card diameter: ${diamMm} mm`, pageW / 2, pageH - 4 * scale);
+        }
+
+        colsInput.addEventListener('input', updatePreview);
+        rowsInput.addEventListener('input', updatePreview);
+
+        // --- Generate button state ---
+        function updateGenerateButton() {
+            generateBtn.disabled = frontImages.length < 7 || !backImageEl;
+        }
+
+        // --- Generate PDF ---
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true;
+            progressBar.classList.remove('hidden');
+            progressBar.value = 0;
+            downloadLink.classList.add('hidden');
+
+            // Revoke previous blob URL if any
+            if (downloadLink.href && downloadLink.href.startsWith('blob:')) {
+                URL.revokeObjectURL(downloadLink.href);
+            }
+
+            const cols = parseInt(colsInput.value) || 3;
+            const rows = parseInt(rowsInput.value) || 3;
+
+            try {
+                const blob = await generatePDF(frontImages, backImageEl, cols, rows, (pct) => {
+                    progressBar.value = pct;
+                });
+
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.classList.remove('hidden');
+            } catch (err) {
+                console.error('PDF generation failed:', err);
+                alert('PDF generation failed: ' + err.message);
+            }
+
+            progressBar.classList.add('hidden');
+            generateBtn.disabled = false;
+        });
+
+        // --- Initial state ---
+        updatePreview();
+    </script>
+</body>
+</html>
