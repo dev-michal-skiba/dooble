@@ -77,89 +77,127 @@ function seededRand(seed) {
 // --- Layout: deterministic positions & sizes, cached per symbol count ---
 // All coordinates are in unit-circle space (R = 1). Scale by actual R at render time.
 
-const layoutCache = {};
+const sizesCache = {};
+const TARGET_FILL = 0.75; // target ratio of total image area to circle area
+const EFFECTIVE_R = 0.99; // unit circle minus 1% margin
 
-function getLayout(count) {
-    if (layoutCache[count]) return layoutCache[count];
+// Returns the image sizes for a given symbol count (cached — same for all cards).
+function getSizes(count) {
+    if (sizesCache[count]) return sizesCache[count];
 
-    const effectiveR = 0.97; // unit circle minus 3% margin
-
-    // Find the largest image size where `count` copies all fit without overlap
-    const maxSize = findMaxSize(count, effectiveR);
-    const minSize = maxSize / 2;
-
-    // Sizes distributed linearly: slot 0 = largest, slot count-1 = smallest
-    const sizes = Array.from({ length: count }, (_, i) => {
+    const weights = Array.from({ length: count }, (_, i) => {
         const t = count > 1 ? i / (count - 1) : 0;
-        return maxSize - t * (maxSize - minSize);
+        return 1 - 0.5 * t;
     });
+    const sumSqWeights = weights.reduce((s, w) => s + w * w, 0);
 
-    const placements = computePlacements(sizes, effectiveR);
-    layoutCache[count] = placements;
-    return placements;
+    const fillMaxSize = Math.sqrt(TARGET_FILL * Math.PI * EFFECTIVE_R * EFFECTIVE_R / sumSqWeights);
+    const fitMaxSize = findMaxSize(weights, EFFECTIVE_R);
+    const maxSize = Math.min(fillMaxSize, fitMaxSize);
+
+    sizesCache[count] = weights.map(w => maxSize * w);
+    return sizesCache[count];
 }
 
-// Binary search: largest size s where `count` images of size s all fit in effectiveR.
-function findMaxSize(count, effectiveR) {
+// Returns a fresh random layout for each call — every card gets its own arrangement.
+function getLayout(count) {
+    return computePlacements(getSizes(count), EFFECTIVE_R);
+}
+
+// Binary search: largest maxSize where weighted images all fit in effectiveR.
+function findMaxSize(weights, effectiveR) {
     let lo = 0;
     let hi = effectiveR * Math.SQRT2; // absolute max: corners just touch circle
 
     for (let iter = 0; iter < 40; iter++) {
         const mid = (lo + hi) / 2;
-        const rand = seededRand(count * 1999 + 7); // same seed every iter → deterministic
-        const result = placeAll(new Array(count).fill(mid), effectiveR, rand, false);
+        const rand = seededRand(weights.length * 1999 + 7); // same seed every iter → deterministic
+        const sizes = weights.map(w => mid * w);
+        const result = placeAll(sizes, effectiveR, rand, false);
         if (result !== null) lo = mid; else hi = mid;
     }
     return lo;
 }
 
 // Place all images with the given sizes. Returns placement array on success, null on failure.
-// With allowFallback=true uses a sector fallback instead of returning null.
+// With allowFallback=true uses best-of-N candidate selection + sector fallback.
 function placeAll(sizes, effectiveR, rand, allowFallback) {
     const placements = [];
 
     for (let idx = 0; idx < sizes.length; idx++) {
         const size = sizes[idx];
-        // Maximum distance from centre so all rotated corners stay within effectiveR
         const maxDist = effectiveR - size * Math.SQRT2 / 2;
-        let placed = false;
 
-        const maxAttempts = allowFallback ? 500 : 300;
-        for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
-            const angle = rand() * Math.PI * 2;
-            const dist = maxDist > 0 ? rand() * maxDist : 0;
-            const x = Math.cos(angle) * dist;
-            const y = Math.sin(angle) * dist;
-            // Bottom of image faces outward from card centre
-            const rotation = Math.PI / 2 - angle;
+        if (!allowFallback) {
+            // Binary-search mode: first-fit is sufficient
+            let placed = false;
+            for (let attempt = 0; attempt < 300 && !placed; attempt++) {
+                const angle = rand() * Math.PI * 2;
+                const dist = maxDist > 0 ? rand() * maxDist : 0;
+                const x = Math.cos(angle) * dist;
+                const y = Math.sin(angle) * dist;
+                const rotation = Math.PI / 2 - angle;
 
-            if (!fitsInCircle(x, y, size, rotation, effectiveR)) continue;
-            if (hasOverlap(placements, x, y, size, rotation)) continue;
+                if (!fitsInCircle(x, y, size, rotation, effectiveR)) continue;
+                if (hasOverlap(placements, x, y, size, rotation)) continue;
 
-            placements.push({ x, y, size, rotation });
-            placed = true;
-        }
+                placements.push({ x, y, size, rotation });
+                placed = true;
+            }
+            if (!placed) return null;
+        } else {
+            // Final placement: pick the best of a few valid candidates
+            let bestCandidate = null;
+            let bestScore = -Infinity;
+            let validCount = 0;
+            const targetCandidates = 10;
 
-        if (!placed) {
-            if (!allowFallback) return null;
-            // Fallback: sector position at reduced size
-            const a = (idx / sizes.length) * Math.PI * 2;
-            const d = Math.max(0, (effectiveR - size * Math.SQRT2 / 2) * 0.3);
-            placements.push({
-                x: Math.cos(a) * d,
-                y: Math.sin(a) * d,
-                size: size * 0.6,
-                rotation: Math.PI / 2 - a
-            });
+            for (let attempt = 0; attempt < 1000       && validCount < targetCandidates; attempt++) {
+                const angle = rand() * Math.PI * 2;
+                const dist = maxDist > 0 ? rand() * maxDist : 0;
+                const x = Math.cos(angle) * dist;
+                const y = Math.sin(angle) * dist;
+                const rotation = Math.PI / 2 - angle;
+
+                if (!fitsInCircle(x, y, size, rotation, effectiveR)) continue;
+                if (hasOverlap(placements, x, y, size, rotation)) continue;
+
+                // Score = minimum distance to any neighbor or boundary
+                let minDist = effectiveR - Math.sqrt(x * x + y * y);
+                for (const p of placements) {
+                    const d = Math.sqrt((p.x - x) ** 2 + (p.y - y) ** 2);
+                    minDist = Math.min(minDist, d);
+                }
+
+                if (minDist > bestScore) {
+                    bestScore = minDist;
+                    bestCandidate = { x, y, size, rotation };
+                }
+                validCount++;
+            }
+
+            if (bestCandidate) {
+                placements.push(bestCandidate);
+            } else {
+                // Fallback: sector position at reduced size
+                const a = (idx / sizes.length) * Math.PI * 2;
+                const d = Math.max(0, (effectiveR - size * Math.SQRT2 / 2) * 0.3);
+                placements.push({
+                    x: Math.cos(a) * d,
+                    y: Math.sin(a) * d,
+                    size: size * 0.6,
+                    rotation: Math.PI / 2 - a
+                });
+            }
         }
     }
 
     return placements;
 }
 
-// Compute final deterministic placement using a separate fixed seed.
+// Compute placement with a random seed — each call produces a different layout.
 function computePlacements(sizes, effectiveR) {
-    const rand = seededRand(sizes.length * 7777 + 3);
+    const rand = seededRand((Math.random() * 0xFFFFFF) | 0);
     return placeAll(sizes, effectiveR, rand, true);
 }
 
