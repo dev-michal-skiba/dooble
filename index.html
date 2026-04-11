@@ -106,17 +106,6 @@
             margin-top: 12px;
             border-radius: 4px;
         }
-        #download-link {
-            display: inline-block;
-            margin-top: 12px;
-            padding: 10px 20px;
-            background: #16a34a;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 500;
-        }
-        #download-link:hover { background: #15803d; }
         .hidden { display: none !important; }
         .back-preview {
             margin-top: 8px;
@@ -159,11 +148,8 @@
 
     <section>
         <h2>3. Generate PDF</h2>
-        <button id="generate-btn" disabled>Generate PDF</button>
+        <button id="generate-btn" disabled>Generate and Download</button>
         <progress id="progress" max="100" value="0" class="hidden"></progress>
-        <div>
-            <a id="download-link" class="hidden" download="dooble-cards.pdf">Download PDF</a>
-        </div>
     </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
@@ -189,7 +175,6 @@
         const previewCanvas = document.getElementById('layout-preview');
         const generateBtn = document.getElementById('generate-btn');
         const progressBar = document.getElementById('progress');
-        const downloadLink = document.getElementById('download-link');
 
         // --- Image loading ---
         function loadImage(file) {
@@ -342,12 +327,6 @@
             generateBtn.disabled = true;
             progressBar.classList.remove('hidden');
             progressBar.value = 0;
-            downloadLink.classList.add('hidden');
-
-            // Revoke previous blob URL if any
-            if (downloadLink.href && downloadLink.href.startsWith('blob:')) {
-                URL.revokeObjectURL(downloadLink.href);
-            }
 
             const cols = parseInt(colsInput.value) || 2;
             const rows = parseInt(rowsInput.value) || 3;
@@ -358,8 +337,11 @@
                 });
 
                 const url = URL.createObjectURL(blob);
-                downloadLink.href = url;
-                downloadLink.classList.remove('hidden');
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dooble-cards.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
             } catch (err) {
                 console.error('PDF generation failed:', err);
                 alert('PDF generation failed: ' + err.message);
