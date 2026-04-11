@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dooble Card Generator</title>
+    <title>Dobble Card Generator</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -119,7 +120,7 @@
     </style>
 </head>
 <body>
-    <h1>Dooble Card Generator</h1>
+    <h1>Dobble Card Generator</h1>
     <p class="subtitle">Generate printable Dobble/Spot It! cards from your images</p>
 
     <section>
@@ -339,7 +340,7 @@
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'dooble-cards.pdf';
+                a.download = 'dobble-cards.pdf';
                 a.click();
                 URL.revokeObjectURL(url);
             } catch (err) {
