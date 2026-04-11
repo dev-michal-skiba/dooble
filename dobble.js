@@ -267,6 +267,8 @@ function renderCardToCanvas(canvas, images, symbolIndices, diameterPx) {
     ctx.clearRect(0, 0, diameterPx, diameterPx);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, diameterPx, diameterPx);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, R - 1, 0, Math.PI * 2);
@@ -316,6 +318,8 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
     ctx.clearRect(0, 0, diameterPx, diameterPx);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, diameterPx, diameterPx);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, R - 1, 0, Math.PI * 2);
@@ -342,6 +346,7 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
 // --- PDF generation ---
 
 const MIN_CARD_GAP = 6; // mm — minimum space between adjacent cards
+const PX_PER_MM = 300 / 25.4; // 300 DPI
 
 async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
     if (!window.jspdf) {
@@ -363,8 +368,7 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
     const gutterY = (usableH - cardDiameter * rows) / (rows + 1);
     const cardsPerPage = cols * rows;
 
-    // Canvas resolution: ~250 DPI
-    const diameterPx = Math.round(cardDiameter * 10);
+    const diameterPx = Math.round(cardDiameter * PX_PER_MM); // 300 DPI
 
     const info = getCardInfo(frontImages.length);
     const cards = generateCards(info.p);
