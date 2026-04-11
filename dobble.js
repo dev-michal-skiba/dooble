@@ -420,3 +420,8 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
 
     return doc.output('blob');
 }
+
+// Export for Node.js testing
+if (typeof module !== 'undefined') {
+    module.exports = { isPrime, findLargestPrime, getCardInfo, generateCards };
+}
