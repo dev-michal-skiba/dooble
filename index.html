@@ -149,7 +149,7 @@
     <section>
         <h2>2. Page Layout</h2>
         <div class="grid-inputs">
-            <label>Cards per row: <input type="number" id="cols" value="3" min="1" max="6"></label>
+            <label>Cards per row: <input type="number" id="cols" value="2" min="1" max="6"></label>
             <label>Rows per page: <input type="number" id="rows" value="3" min="1" max="6"></label>
         </div>
         <div class="preview-container">
@@ -349,7 +349,7 @@
                 URL.revokeObjectURL(downloadLink.href);
             }
 
-            const cols = parseInt(colsInput.value) || 3;
+            const cols = parseInt(colsInput.value) || 2;
             const rows = parseInt(rowsInput.value) || 3;
 
             try {

@@ -227,12 +227,12 @@ function renderCardToCanvas(canvas, images, symbolIndices, diameterPx) {
     const R = diameterPx / 2;
 
     ctx.clearRect(0, 0, diameterPx, diameterPx);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, diameterPx, diameterPx);
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, R - 1, 0, Math.PI * 2);
     ctx.clip();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, diameterPx, diameterPx);
 
     // Layout slots (position/size) are fixed; randomly assign which symbol gets which slot
     const layout = getLayout(symbolIndices.length);
@@ -276,6 +276,8 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
     const R = diameterPx / 2;
 
     ctx.clearRect(0, 0, diameterPx, diameterPx);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, diameterPx, diameterPx);
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, R - 1, 0, Math.PI * 2);
@@ -353,7 +355,7 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
             const y = margin + gutterY + row * (cardDiameter + gutterY);
 
             renderCardToCanvas(canvas, frontImages, cards[i], diameterPx);
-            doc.addImage(canvas, 'JPEG', x, y, cardDiameter, cardDiameter);
+            doc.addImage(canvas, 'PNG', x, y, cardDiameter, cardDiameter);
             cardPositions.push({ col, row });
         }
 
@@ -368,7 +370,7 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
             const y = margin + gutterY + row * (cardDiameter + gutterY);
 
             renderBackToCanvas(canvas, backImage, diameterPx);
-            doc.addImage(canvas, 'JPEG', x, y, cardDiameter, cardDiameter);
+            doc.addImage(canvas, 'PNG', x, y, cardDiameter, cardDiameter);
         }
 
         if (onProgress) {
