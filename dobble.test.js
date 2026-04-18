@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { findLargestPrime, getCardInfo, generateCards } = require('./dobble.js');
+const { findLargestPrime, getCardInfo, generateCards, getSizes, getLayout, squaresOverlap } = require('./dobble.js');
 
 const IMAGE_COUNT = 57;
 const REPETITIONS = 100;
@@ -44,3 +44,49 @@ test(`generateCards produces valid Dobble deck from ${IMAGE_COUNT} images (x${RE
         }
     }
 });
+
+// Image counts that map to each supported prime p:
+//   p=2 →  7 images,  3 symbols/card
+//   p=3 → 13 images,  4 symbols/card
+//   p=4 → 21 images,  5 symbols/card  (p=4 is not prime; findLargestPrime returns 3 → 13 used)
+//   p=5 → 31 images,  6 symbols/card
+//   p=7 → 57 images,  8 symbols/card
+const LAYOUT_TEST_CASES = [7, 13, 31, 57];
+const LAYOUT_REPETITIONS = 20;
+
+function hasAnyOverlap(placements) {
+    for (let i = 0; i < placements.length; i++) {
+        for (let j = i + 1; j < placements.length; j++) {
+            const a = placements[i];
+            const b = placements[j];
+            if (squaresOverlap(a.x, a.y, a.size, a.rotation, b.x, b.y, b.size, b.rotation)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+for (const imageCount of LAYOUT_TEST_CASES) {
+    const { symbolsPerCard } = getCardInfo(imageCount);
+
+    test(`getLayout produces no overlapping images for ${imageCount} images (${symbolsPerCard} symbols/card, x${LAYOUT_REPETITIONS})`, () => {
+        const sizes = getSizes(symbolsPerCard);
+
+        for (let run = 0; run < LAYOUT_REPETITIONS; run++) {
+            const layout = getLayout(symbolsPerCard);
+
+            assert.equal(
+                layout.length,
+                symbolsPerCard,
+                `Run ${run + 1}: expected ${symbolsPerCard} placements, got ${layout.length}`
+            );
+
+            assert.equal(
+                hasAnyOverlap(layout),
+                false,
+                `Run ${run + 1}: overlapping images detected in layout for ${imageCount} images`
+            );
+        }
+    });
+}

@@ -179,15 +179,28 @@ function placeAll(sizes, effectiveR, rand, allowFallback) {
             if (bestCandidate) {
                 placements.push(bestCandidate);
             } else {
-                // Fallback: sector position at reduced size
-                const a = (idx / sizes.length) * Math.PI * 2;
-                const d = Math.max(0, (effectiveR - size * Math.SQRT2 / 2) * 0.3);
-                placements.push({
-                    x: Math.cos(a) * d,
-                    y: Math.sin(a) * d,
-                    size: size * 0.6,
-                    rotation: Math.PI / 2 - a
-                });
+                // Fallback: scan evenly-spaced sector positions at reduced size,
+                // but still enforce the no-overlap constraint.
+                const reducedSize = size * 0.65;
+                const maxD = Math.max(0, effectiveR - reducedSize * Math.SQRT2 / 2);
+                const sectors = Math.max(sizes.length * 6, 48);
+                let placed = false;
+                outer: for (let s = 0; s < sectors; s++) {
+                    const a = (s / sectors) * Math.PI * 2;
+                    for (let step = 0; step <= 5; step++) {
+                        const d = maxD * (step / 5);
+                        const x = Math.cos(a) * d;
+                        const y = Math.sin(a) * d;
+                        const rotation = Math.PI / 2 - a;
+                        if (fitsInCircle(x, y, reducedSize, rotation, effectiveR) &&
+                            !hasOverlap(placements, x, y, reducedSize, rotation)) {
+                            placements.push({ x, y, size: reducedSize, rotation });
+                            placed = true;
+                            break outer;
+                        }
+                    }
+                }
+                if (!placed) return null;
             }
         }
     }
@@ -195,10 +208,23 @@ function placeAll(sizes, effectiveR, rand, allowFallback) {
     return placements;
 }
 
-// Compute placement with a random seed — each call produces a different layout.
+// Compute placement with a random seed — retries with smaller sizes until a
+// fully overlap-free layout is found.
 function computePlacements(sizes, effectiveR) {
-    const rand = seededRand((Math.random() * 0xFFFFFF) | 0);
-    return placeAll(sizes, effectiveR, rand, true);
+    for (let scale = 1.0; scale >= 0.4; scale -= 0.05) {
+        const scaledSizes = scale === 1.0 ? sizes : sizes.map(s => s * scale);
+        const attempts = scale < 0.8 ? 60 : 30;
+        for (let i = 0; i < attempts; i++) {
+            const rand = seededRand((Math.random() * 0xFFFFFF) | 0);
+            const result = placeAll(scaledSizes, effectiveR, rand, true);
+            if (result !== null) return result;
+        }
+    }
+    // Absolute last resort — tiny images spread around the circle
+    return sizes.map((_, i) => {
+        const a = (i / sizes.length) * Math.PI * 2;
+        return { x: Math.cos(a) * effectiveR * 0.3, y: Math.sin(a) * effectiveR * 0.3, size: 0.05, rotation: 0 };
+    });
 }
 
 // --- Circle / overlap checks ---
@@ -427,5 +453,5 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
 
 // Export for Node.js testing
 if (typeof module !== 'undefined') {
-    module.exports = { isPrime, findLargestPrime, getCardInfo, generateCards };
+    module.exports = { isPrime, findLargestPrime, getCardInfo, generateCards, getSizes, getLayout, squaresOverlap };
 }
