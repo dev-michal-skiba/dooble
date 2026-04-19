@@ -394,7 +394,7 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
     const gutterY = (usableH - cardDiameter * rows) / (rows + 1);
     const cardsPerPage = cols * rows;
 
-    const diameterPx = Math.round(cardDiameter * PX_PER_MM); // 300 DPI
+    const diameterPx = Math.min(Math.round(cardDiameter * PX_PER_MM), 1000);
 
     const info = getCardInfo(frontImages.length);
     const cards = generateCards(info.p);
