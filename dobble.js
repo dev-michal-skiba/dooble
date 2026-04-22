@@ -291,8 +291,6 @@ function renderCardToCanvas(canvas, images, symbolIndices, diameterPx) {
     const R = diameterPx / 2;
 
     ctx.clearRect(0, 0, diameterPx, diameterPx);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, diameterPx, diameterPx);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.save();
@@ -342,8 +340,6 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
     const R = diameterPx / 2;
 
     ctx.clearRect(0, 0, diameterPx, diameterPx);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, diameterPx, diameterPx);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.save();
@@ -371,30 +367,98 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
 
 // --- PDF generation ---
 
-const MIN_CARD_GAP = 6; // mm — minimum space between adjacent cards
+const MIN_CARD_GAP = 6; // mm — minimum space between adjacent cards and page borders
 const PX_PER_MM = 300 / 25.4; // 300 DPI
 
-async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
+// Available centre-coordinate space on A4 with 10mm margin + 6mm gap on each side:
+// x: 178mm wide, y: 265mm tall. Page centre at (105, 148.5).
+const CENTRE_W = 178;
+const CENTRE_H = 265;
+const PAGE_CENTRE_X = 105;
+const PAGE_CENTRE_Y = 148.5;
+
+// For 2-4 cards, a zigzag alternating between x=0 and x=(CENTRE_W-D) gives the
+// densest packing. At maximum D, both the horizontal span (CENTRE_W-D) and
+// vertical span (N-1)*dy saturate, yielding D² - bD + c = 0. This is only valid
+// when same-column circles (indices i, i+2) have 2*dy ≥ D+GAP, which holds when
+// D ≥ ~92.6mm — true for N ≤ 4 but not for N ≥ 5.
+function zigzagLayout(n) {
+    const k = (n - 1) * (n - 1);
+    const b = 530 + 368 * k;
+    const c = 70225 + 31648 * k;
+    const D = (b - Math.sqrt(b * b - 4 * c)) / 2;
+    const w = CENTRE_W - D;
+    const s = D + MIN_CARD_GAP;
+    const dy = Math.sqrt(Math.max(0, s * s - w * w));
+    const xLeft = PAGE_CENTRE_X - w / 2;
+    const xRight = PAGE_CENTRE_X + w / 2;
+    const yTop = PAGE_CENTRE_Y - (n - 1) * dy / 2;
+    const positions = [];
+    for (let i = 0; i < n; i++) {
+        positions.push({
+            x: i % 2 === 0 ? xLeft : xRight,
+            y: yTop + i * dy,
+        });
+    }
+    return { positions, maxDiameter: Math.floor(D * 10) / 10 };
+}
+
+// Quincunx (4 corners + middle) is the densest layout for N=5. Binding
+// constraint is horizontal: a = D+GAP = CENTRE_W-D => D = (CENTRE_W-GAP)/2 = 86.
+function quincunxLayout() {
+    const D = (CENTRE_W - MIN_CARD_GAP) / 2; // 86
+    const s = D + MIN_CARD_GAP;              // 92
+    const b = Math.sqrt(3) / 2 * s;          // offset of middle circle
+    const c = 2 * b;                         // total vertical span of centres
+    return {
+        positions: [
+            { x: PAGE_CENTRE_X - s / 2, y: PAGE_CENTRE_Y - c / 2 },
+            { x: PAGE_CENTRE_X + s / 2, y: PAGE_CENTRE_Y - c / 2 },
+            { x: PAGE_CENTRE_X,         y: PAGE_CENTRE_Y - c / 2 + b },
+            { x: PAGE_CENTRE_X - s / 2, y: PAGE_CENTRE_Y + c / 2 },
+            { x: PAGE_CENTRE_X + s / 2, y: PAGE_CENTRE_Y + c / 2 },
+        ],
+        maxDiameter: Math.floor(D * 10) / 10,
+    };
+}
+
+// For N=6, a 2×3 rectangular grid is optimal (height-limited: 3D+12 = 265).
+function grid2x3Layout() {
+    const D = (CENTRE_H - 2 * MIN_CARD_GAP) / 3; // 253/3 ≈ 84.333
+    const s = D + MIN_CARD_GAP;
+    const positions = [];
+    for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 2; col++) {
+            positions.push({
+                x: PAGE_CENTRE_X - s / 2 + col * s,
+                y: PAGE_CENTRE_Y - s + row * s,
+            });
+        }
+    }
+    return { positions, maxDiameter: Math.floor(D * 10) / 10 };
+}
+
+function findOptimalLayout(n) {
+    if (n === 1) {
+        return {
+            positions: [{ x: PAGE_CENTRE_X, y: PAGE_CENTRE_Y }],
+            maxDiameter: Math.floor(CENTRE_W * 10) / 10,
+        };
+    }
+    if (n >= 2 && n <= 4) return zigzagLayout(n);
+    if (n === 5) return quincunxLayout();
+    if (n === 6) return grid2x3Layout();
+    throw new Error('Unsupported cards-per-page: ' + n);
+}
+
+async function generatePDF(frontImages, backImage, layoutPositions, cardDiameter, cardsPerPage, onProgress) {
     if (!window.jspdf) {
         throw new Error('jsPDF library failed to load. Please check your internet connection and try reloading the page.');
     }
     const { jsPDF } = window.jspdf;
 
-    const pageW = 210; // A4 width mm
-    const pageH = 297; // A4 height mm
-    const margin = 10; // mm
-    const usableW = pageW - 2 * margin;
-    const usableH = pageH - 2 * margin;
-
-    const cardDiameter = Math.min(
-        (usableW - MIN_CARD_GAP * (cols + 1)) / cols,
-        (usableH - MIN_CARD_GAP * (rows + 1)) / rows
-    );
-    const gutterX = (usableW - cardDiameter * cols) / (cols + 1);
-    const gutterY = (usableH - cardDiameter * rows) / (rows + 1);
-    const cardsPerPage = cols * rows;
-
-    const diameterPx = Math.min(Math.round(cardDiameter * PX_PER_MM), 1000);
+    const D = cardDiameter;
+    const diameterPx = Math.min(Math.round(D * PX_PER_MM), 1000);
 
     const info = getCardInfo(frontImages.length);
     const cards = generateCards(info.p);
@@ -412,38 +476,26 @@ async function generatePDF(frontImages, backImage, cols, rows, onProgress) {
 
         const startCard = pageIdx * cardsPerPage;
         const endCard = Math.min(startCard + cardsPerPage, cards.length);
-        const cardPositions = [];
+        const frontCentres = [];
 
         for (let i = startCard; i < endCard; i++) {
-            const localIdx = i - startCard;
-            const col = localIdx % cols;
-            const row = Math.floor(localIdx / cols);
-
-            const x = margin + gutterX + col * (cardDiameter + gutterX);
-            const y = margin + gutterY + row * (cardDiameter + gutterY);
-
+            const { x, y } = layoutPositions[i - startCard];
             renderCardToCanvas(canvas, frontImages, cards[i], diameterPx);
-            doc.addImage(canvas, 'PNG', x, y, cardDiameter, cardDiameter);
-            cardPositions.push({ col, row });
+            doc.addImage(canvas, 'PNG', x - D / 2, y - D / 2, D, D);
+            frontCentres.push({ x, y });
         }
 
         // --- Back page (mirrored horizontally for long-edge flip) ---
         doc.addPage();
 
-        for (let i = 0; i < cardPositions.length; i++) {
-            const { col, row } = cardPositions[i];
-            const mirroredCol = cols - 1 - col;
-
-            const x = margin + gutterX + mirroredCol * (cardDiameter + gutterX);
-            const y = margin + gutterY + row * (cardDiameter + gutterY);
-
+        for (const { x, y } of frontCentres) {
+            const mirroredX = 210 - x; // flip about page centre (210mm wide)
             renderBackToCanvas(canvas, backImage, diameterPx);
-            doc.addImage(canvas, 'PNG', x, y, cardDiameter, cardDiameter);
+            doc.addImage(canvas, 'PNG', mirroredX - D / 2, y - D / 2, D, D);
         }
 
         if (onProgress) {
             onProgress(Math.round(((pageIdx + 1) / totalPages) * 100));
-            // Yield to browser for UI update
             await new Promise(r => setTimeout(r, 0));
         }
     }

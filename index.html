@@ -57,20 +57,25 @@
         .stats.error {
             background: #f8d7da;
         }
-        .grid-inputs {
+        .layout-controls {
             display: flex;
-            gap: 16px;
-            align-items: center;
+            flex-direction: column;
+            gap: 12px;
             margin-bottom: 12px;
         }
-        .grid-inputs label {
+        .layout-controls label {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             margin-bottom: 0;
+            flex-wrap: wrap;
         }
-        .grid-inputs input[type="number"] {
-            width: 60px;
+        .layout-controls input[type="range"] {
+            flex: 1;
+            min-width: 120px;
+        }
+        #card-diameter {
+            width: 80px;
             padding: 6px 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -138,9 +143,13 @@
 
     <section>
         <h2>2. Page Layout</h2>
-        <div class="grid-inputs">
-            <label>Cards per row: <input type="number" id="cols" value="2" min="1" max="6"></label>
-            <label>Rows per page: <input type="number" id="rows" value="3" min="1" max="6"></label>
+        <div class="layout-controls">
+            <label>Cards per page: <span id="cards-count">4</span>
+                <input type="range" id="cards-per-page" min="1" max="6" step="1" value="4">
+            </label>
+            <label>Card diameter (mm):
+                <input type="number" id="card-diameter" min="6" step="0.1">
+            </label>
         </div>
         <div class="preview-container">
             <canvas id="layout-preview" width="210" height="297"></canvas>
@@ -171,9 +180,13 @@
         const frontThumbs = document.getElementById('front-thumbnails');
         const backPreview = document.getElementById('back-preview');
         const statsDiv = document.getElementById('upload-stats');
-        const colsInput = document.getElementById('cols');
-        const rowsInput = document.getElementById('rows');
+        const cardsSlider   = document.getElementById('cards-per-page');
+        const cardsCountEl  = document.getElementById('cards-count');
+        const diameterInput = document.getElementById('card-diameter');
         const previewCanvas = document.getElementById('layout-preview');
+
+        let currentLayoutPositions = null;
+        let currentMaxDiameter = 0;
         const generateBtn = document.getElementById('generate-btn');
         const progressBar = document.getElementById('progress');
 
@@ -263,60 +276,53 @@
 
         // --- Layout preview ---
         function updatePreview() {
-            const cols = parseInt(colsInput.value) || 1;
-            const rows = parseInt(rowsInput.value) || 1;
+            const n = parseInt(cardsSlider.value);
+            cardsCountEl.textContent = n;
+
+            const { positions, maxDiameter } = findOptimalLayout(n);
+            currentLayoutPositions = positions;
+            currentMaxDiameter = maxDiameter;
+            diameterInput.max = maxDiameter;
+            diameterInput.value = maxDiameter;
+
+            drawPreview();
+        }
+
+        function drawPreview() {
+            const D = Math.max(6, Math.min(currentMaxDiameter,
+                parseFloat(diameterInput.value) || currentMaxDiameter));
 
             const scale = 1.5;
             const pageW = 210 * scale;
             const pageH = 297 * scale;
             previewCanvas.width = pageW;
             previewCanvas.height = pageH;
-            previewCanvas.style.width = `${210}px`;
-            previewCanvas.style.height = `${297}px`;
+            previewCanvas.style.width = '210px';
+            previewCanvas.style.height = '297px';
 
             const ctx = previewCanvas.getContext('2d');
-
-            // Page background
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, pageW, pageH);
             ctx.strokeStyle = '#ccc';
             ctx.lineWidth = 1;
             ctx.strokeRect(0, 0, pageW, pageH);
 
-            const margin = 10 * scale;
-            const usableW = pageW - 2 * margin;
-            const usableH = pageH - 2 * margin;
-            const minGap = MIN_CARD_GAP * scale;
-            const cardDiameter = Math.min(
-                (usableW - minGap * (cols + 1)) / cols,
-                (usableH - minGap * (rows + 1)) / rows
-            );
-            const gutterX = (usableW - cardDiameter * cols) / (cols + 1);
-            const gutterY = (usableH - cardDiameter * rows) / (rows + 1);
-
             ctx.strokeStyle = '#2563eb';
             ctx.lineWidth = 1.5;
-
-            for (let row = 0; row < rows; row++) {
-                for (let col = 0; col < cols; col++) {
-                    const x = margin + gutterX + col * (cardDiameter + gutterX) + cardDiameter / 2;
-                    const y = margin + gutterY + row * (cardDiameter + gutterY) + cardDiameter / 2;
-                    ctx.beginPath();
-                    ctx.arc(x, y, cardDiameter / 2, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
+            for (const { x, y } of currentLayoutPositions) {
+                ctx.beginPath();
+                ctx.arc(x * scale, y * scale, D / 2 * scale, 0, Math.PI * 2);
+                ctx.stroke();
             }
 
-            // Show card diameter in mm
-            const diamMm = (cardDiameter / scale).toFixed(1);
             ctx.fillStyle = '#666';
             ctx.font = `${11 * scale}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(`Card diameter: ${diamMm} mm`, pageW / 2, pageH - 4 * scale);
+            ctx.fillText(`Card diameter: ${D.toFixed(1)} mm`, pageW / 2, pageH - 4 * scale);
         }
 
-        colsInput.addEventListener('input', updatePreview);
-        rowsInput.addEventListener('input', updatePreview);
+        cardsSlider.addEventListener('input', updatePreview);
+        diameterInput.addEventListener('input', drawPreview);
 
         // --- Generate button state ---
         function updateGenerateButton() {
@@ -329,13 +335,16 @@
             progressBar.classList.remove('hidden');
             progressBar.value = 0;
 
-            const cols = parseInt(colsInput.value) || 2;
-            const rows = parseInt(rowsInput.value) || 3;
+            const n = parseInt(cardsSlider.value);
+            const D = Math.max(6, Math.min(currentMaxDiameter,
+                parseFloat(diameterInput.value) || currentMaxDiameter));
 
             try {
-                const blob = await generatePDF(frontImages, backImageEl, cols, rows, (pct) => {
-                    progressBar.value = pct;
-                });
+                const blob = await generatePDF(
+                    frontImages, backImageEl,
+                    currentLayoutPositions, D, n,
+                    (pct) => { progressBar.value = pct; }
+                );
 
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
