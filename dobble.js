@@ -321,11 +321,13 @@ function renderCardToCanvas(canvas, images, symbolIndices, diameterPx) {
 
     ctx.restore();
 
-    // Draw circle border
+    // Draw circle border — arc radius is inset so the full stroke width stays
+    // inside the canvas, preventing uneven clipping at the canvas edge.
+    const borderLW = Math.max(4, Math.round(diameterPx * 0.012));
     ctx.beginPath();
-    ctx.arc(cx, cy, R - 2, 0, Math.PI * 2);
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = Math.max(2, diameterPx * 0.006);
+    ctx.arc(cx, cy, R - Math.ceil(borderLW / 2) - 1, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = borderLW;
     ctx.stroke();
 }
 
@@ -357,11 +359,12 @@ function renderBackToCanvas(canvas, backImage, diameterPx) {
 
     ctx.restore();
 
-    // Border
+    // Border — same inset logic as front to keep stroke within canvas bounds
+    const borderLW = Math.max(4, Math.round(diameterPx * 0.012));
     ctx.beginPath();
-    ctx.arc(cx, cy, R - 2, 0, Math.PI * 2);
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = Math.max(2, diameterPx * 0.006);
+    ctx.arc(cx, cy, R - Math.ceil(borderLW / 2) - 1, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = borderLW;
     ctx.stroke();
 }
 
@@ -458,7 +461,7 @@ async function generatePDF(frontImages, backImage, layoutPositions, cardDiameter
     const { jsPDF } = window.jspdf;
 
     const D = cardDiameter;
-    const diameterPx = Math.min(Math.round(D * PX_PER_MM), 1000);
+    const diameterPx = Math.round(D * PX_PER_MM);
 
     const info = getCardInfo(frontImages.length);
     const cards = generateCards(info.p);
