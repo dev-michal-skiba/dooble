@@ -321,14 +321,6 @@ function renderCardToCanvas(canvas, images, symbolIndices, diameterPx) {
 
     ctx.restore();
 
-    // Draw circle border — arc radius is inset so the full stroke width stays
-    // inside the canvas, preventing uneven clipping at the canvas edge.
-    const borderLW = Math.max(2, Math.round(diameterPx * 0.006));
-    ctx.beginPath();
-    ctx.arc(cx, cy, R - Math.ceil(borderLW / 2) - 1, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = borderLW;
-    ctx.stroke();
 }
 
 // --- Render card back ---
