@@ -15,8 +15,52 @@
             max-width: 800px;
             margin: 0 auto;
         }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
         h1 { margin-bottom: 8px; }
         .subtitle { color: #666; margin-bottom: 24px; }
+        #lang-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+            background: #fff;
+            color: #666;
+            border: 1px solid #ddd;
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+        #lang-toggle:hover { background: #f0f0f0; }
+        #lang-toggle svg { width: 18px; height: 18px; }
+        #lang-toggle .active { color: #2563eb; font-weight: 700; }
+        details summary {
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        details[open] summary { margin-bottom: 12px; }
+        .help { line-height: 1.6; }
+        .help h3 { font-size: 1em; margin: 16px 0 6px; }
+        .help ol, .help ul { padding-left: 24px; }
+        .help table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 0.95em;
+        }
+        .help th, .help td {
+            border: 1px solid #ddd;
+            padding: 4px 12px;
+            text-align: center;
+        }
+        .help th { background: #f5f5f5; }
+        .help tr.recommended td {
+            background: #e8f4fd;
+            font-weight: 700;
+        }
         section {
             background: #fff;
             border-radius: 8px;
@@ -125,16 +169,70 @@
     </style>
 </head>
 <body>
-    <h1>Dobble Card Generator</h1>
-    <p class="subtitle">Generate printable Dobble/Spot It! cards from your images</p>
+    <header>
+        <div>
+            <h1 data-i18n="title">Generator kart Dobble</h1>
+            <p class="subtitle" data-i18n="subtitle"></p>
+        </div>
+        <button id="lang-toggle" type="button" data-i18n-aria="lang.toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
+            </svg>
+            <span data-lang="pl">PL</span>|<span data-lang="en">EN</span>
+        </button>
+    </header>
 
     <section>
-        <h2>1. Upload Card Images</h2>
-        <label for="front-images">Front images (select multiple):</label>
+        <details open class="help">
+            <summary data-i18n="help.title"></summary>
+            <p data-i18n-html="help.what"></p>
+
+            <h3 data-i18n="help.howMany.title"></h3>
+            <p data-i18n="help.howMany.text"></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th data-i18n="help.table.images"></th>
+                        <th data-i18n="help.table.cards"></th>
+                        <th data-i18n="help.table.perCard"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>7</td><td>7</td><td>3</td></tr>
+                    <tr><td>13</td><td>13</td><td>4</td></tr>
+                    <tr><td>31</td><td>31</td><td>6</td></tr>
+                    <tr class="recommended"><td>57 ⭐ <span data-i18n="help.table.recommended"></span></td><td>57</td><td>8</td></tr>
+                    <tr><td>133</td><td>133</td><td>12</td></tr>
+                </tbody>
+            </table>
+            <p data-i18n-html="help.recommend"></p>
+
+            <h3 data-i18n="help.steps.title"></h3>
+            <ol>
+                <li data-i18n="help.steps.1"></li>
+                <li data-i18n="help.steps.2"></li>
+                <li data-i18n="help.steps.3"></li>
+                <li data-i18n="help.steps.4"></li>
+            </ol>
+
+            <h3 data-i18n="help.tips.title"></h3>
+            <ul>
+                <li data-i18n="help.tips.1"></li>
+                <li data-i18n="help.tips.2"></li>
+                <li data-i18n="help.tips.3"></li>
+                <li data-i18n="help.tips.4"></li>
+            </ul>
+        </details>
+    </section>
+
+    <section>
+        <h2 data-i18n="upload.title"></h2>
+        <label for="front-images" data-i18n="upload.front"></label>
         <input type="file" id="front-images" multiple accept="image/*">
         <div id="front-thumbnails" class="thumbnails"></div>
 
-        <label for="back-image">Card back image:</label>
+        <label for="back-image" data-i18n="upload.back"></label>
         <input type="file" id="back-image" accept="image/*">
         <div id="back-preview" class="back-preview"></div>
 
@@ -142,12 +240,12 @@
     </section>
 
     <section>
-        <h2>2. Page Layout</h2>
+        <h2 data-i18n="layout.title"></h2>
         <div class="layout-controls">
-            <label>Cards per page: <span id="cards-count">4</span>
+            <label><span data-i18n="layout.cardsPerPage"></span> <span id="cards-count">4</span>
                 <input type="range" id="cards-per-page" min="1" max="6" step="1" value="4">
             </label>
-            <label>Card diameter (mm):
+            <label><span data-i18n="layout.diameter"></span>
                 <input type="number" id="card-diameter" min="6" step="0.1">
             </label>
         </div>
@@ -157,8 +255,8 @@
     </section>
 
     <section>
-        <h2>3. Generate PDF</h2>
-        <button id="generate-btn" disabled>Generate and Download</button>
+        <h2 data-i18n="generate.title"></h2>
+        <button id="generate-btn" disabled data-i18n="generate.button"></button>
         <progress id="progress" max="100" value="0" class="hidden"></progress>
     </section>
 
@@ -169,7 +267,11 @@
         }
     </script>
     <script src="dobble.js"></script>
+    <script src="i18n.js"></script>
     <script>
+        // Same deck size as the original game (p = 7)
+        const RECOMMENDED_IMAGES = 57;
+
         // --- State ---
         let frontImages = [];
         let backImageEl = null;
@@ -257,21 +359,44 @@
 
             if (n < 7) {
                 statsDiv.className = 'stats error';
-                statsDiv.innerHTML = `${n} images uploaded. Need at least 7 images (minimum for p=2: 7 cards with 3 images each).`;
+                statsDiv.innerHTML = t('stats.tooFew', { n, images: tn('unit.image', n) });
                 return;
             }
 
             const info = getCardInfo(n);
             const unused = n - info.totalSymbols;
 
+            const lines = [
+                t('stats.uploaded', { n }),
+                t('stats.cards', { n: info.totalCards }),
+                t('stats.perCard', { n: info.symbolsPerCard }),
+                t('stats.used', { n: info.totalSymbols }),
+            ];
+            if (unused > 0) {
+                lines.push(t('stats.unused', { n: unused }));
+            }
+            if (info.totalSymbols < RECOMMENDED_IMAGES) {
+                const next = getNextLevel(info.p);
+                const missing = next.totalSymbols - n;
+                lines.push('💡 ' + t('stats.nextLevel', {
+                    missing,
+                    images: tn('unit.image', missing),
+                    cards: next.totalCards,
+                    cardsWord: tn('unit.card', next.totalCards),
+                }));
+            } else if (info.totalSymbols === RECOMMENDED_IMAGES) {
+                lines.push('✅ ' + t('stats.perfect'));
+            }
+
             statsDiv.className = unused > 0 ? 'stats warning' : 'stats';
-            statsDiv.innerHTML =
-                `<strong>${n}</strong> images uploaded<br>` +
-                `Prime order: <strong>p = ${info.p}</strong><br>` +
-                `Cards to generate: <strong>${info.totalCards}</strong><br>` +
-                `Images per card: <strong>${info.symbolsPerCard}</strong><br>` +
-                `Images used: <strong>${info.totalSymbols}</strong>` +
-                (unused > 0 ? ` (${unused} unused)` : '');
+            statsDiv.innerHTML = lines.join('<br>');
+        }
+
+        // Smallest deck bigger than the one built on prime p
+        function getNextLevel(p) {
+            let q = p + 1;
+            while (!isPrime(q)) q++;
+            return getCardInfo(q * q + q + 1);
         }
 
         // --- Layout preview ---
@@ -318,7 +443,7 @@
             ctx.fillStyle = '#666';
             ctx.font = `${11 * scale}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(`Card diameter: ${D.toFixed(1)} mm`, pageW / 2, pageH - 4 * scale);
+            ctx.fillText(t('layout.previewDiameter', { d: D.toFixed(1) }), pageW / 2, pageH - 4 * scale);
         }
 
         cardsSlider.addEventListener('input', updatePreview);
@@ -354,14 +479,32 @@
                 URL.revokeObjectURL(url);
             } catch (err) {
                 console.error('PDF generation failed:', err);
-                alert('PDF generation failed: ' + err.message);
+                alert(t('generate.error', { message: err.message }));
             }
 
             progressBar.classList.add('hidden');
             generateBtn.disabled = false;
         });
 
+        // --- Language ---
+        const langToggle = document.getElementById('lang-toggle');
+
+        function renderLanguage() {
+            applyTranslations();
+            for (const span of langToggle.querySelectorAll('[data-lang]')) {
+                span.classList.toggle('active', span.dataset.lang === getLang());
+            }
+            updateStats();
+            if (currentLayoutPositions) drawPreview();
+        }
+
+        langToggle.addEventListener('click', () => {
+            setLang(getLang() === 'pl' ? 'en' : 'pl');
+            renderLanguage();
+        });
+
         // --- Initial state ---
+        renderLanguage();
         updatePreview();
     </script>
 </body>

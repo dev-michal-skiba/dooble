@@ -11,6 +11,8 @@ Dobble (also known as Spot It!) is a card game where each card has several image
 1. Open `index.html` in any modern browser (Chrome, Firefox, Edge, Safari)
 2. No server, build step, or installation required
 
+The page is available in **Polish** (default) and **English** — switch with the globe button in the top-right corner. The choice is remembered in the browser.
+
 ## How to Use
 
 ### Step 1: Upload Images
@@ -27,6 +29,8 @@ The app will calculate how many cards can be generated based on your image count
 | 21           | 4*        | -     | -               |
 | 31           | 5         | 31    | 6               |
 | 57           | 7         | 57    | 8               |
+
+**57 images is recommended** — the same deck size as the original game.
 
 \* p must be prime, so 21 images still uses p=3 (13 cards). The largest prime p where p²+p+1 ≤ your image count is used.
 
@@ -75,5 +79,6 @@ Cards are generated using three types of "lines" over the finite field Z_p:
 ```
 index.html   - UI, styling, image upload handling, orchestration
 dobble.js    - Card generation algorithm, canvas rendering, PDF assembly
+i18n.js      - Polish/English translations and language switching
 README.md    - This file
 ```

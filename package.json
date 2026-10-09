@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "node --test dobble.test.js"
+    "test": "node --test dobble.test.js i18n.test.js"
   },
   "engines": {
     "node": ">=18"
